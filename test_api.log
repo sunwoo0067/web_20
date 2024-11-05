@@ -1,0 +1,570 @@
+import asyncio
+import httpx
+import json
+import logging
+import sys
+from datetime import datetime
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler('test_api.log')
+    ]
+)
+logger = logging.getLogger(__name__)
+
+async def get_auth_token():
+    auth_url = "https://auth-sandbox.ownerclan.com/auth"
+    
+    auth_data = {
+        "service": "ownerclan",
+        "userType": "seller",
+        "username": "b00679540",
+        "password": "ehdgod1101*",
+        "grant_type": "password"
+    }
+    
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "X-API-KEY": "sandbox"
+    }
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            logger.info("Requesting auth token...")
+            logger.info(f"Auth URL: {auth_url}")
+            logger.info(f"Auth Headers: {headers}")
+            logger.info(f"Auth Data: {json.dumps(auth_data, indent=2, ensure_ascii=False)}")
+            
+            response = await client.post(
+                auth_url,
+                json=auth_data,
+                headers=headers
+            )
+            
+            logger.info(f"Auth Response Status: {response.status_code}")
+            response_data = response.json()
+            logger.info(f"Auth Response: {json.dumps(response_data, indent=2, ensure_ascii=False)}")
+            
+            if response.status_code == 200:
+                token = response_data.get("access_token")
+                if token:
+                    logger.info("Successfully received auth token")
+                    return token
+                else:
+                    logger.error("Token not found in response")
+                    return None
+            else:
+                logger.error(f"Auth failed. Status: {response.status_code}")
+                logger.error(f"Auth Response: {json.dumps(response_data, indent=2, ensure_ascii=False)}")
+                return None
+    except Exception as e:
+        logger.error(f"An error occurred while requesting auth token: {e}")
+        return None
+
+async def test_ownerclan_api():
+    try:
+        logger.info("=== Starting Ownerclan API Test ===")
+        
+        # JWT ÌÜ†ÌÅ∞ ÏñªÍ∏∞
+        token = await get_auth_token()
+        if not token:
+            logger.error("Failed to get auth token")
+            return
+            
+        api_url = "https://api-sandbox.ownerclan.com/v1/graphql"
+        
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": f"Bearer {token}"
+        }
+        
+        # ÏÉÅÌíà Ï°∞Ìöå ÏøºÎ¶¨
+        products_query = '''
+        query Products($offset: Int, $limit: Int) {
+            products(offset: $offset, limit: $limit) {
+                items {
+                    id
+                    name
+                    price
+                }
+                total
+            }
+        }
+        '''
+        
+        variables = {
+            "offset": 0,
+            "limit": 10
+        }
+        
+        request_data = {
+            "query": products_query,
+            "variables": variables
+        }
+        
+        logger.info(f"API URL: {api_url}")
+        logger.info(f"Request Headers: {headers}")
+        logger.info(f"Request Data: {json.dumps(request_data, indent=2)}")
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                logger.info("Sending products request...")
+                response = await client.post(
+                    api_url,
+                    json=request_data,
+                    headers=headers
+                )
+                
+                logger.info(f"Response Status Code: {response.status_code}")
+                logger.info(f"Response Headers: {dict(response.headers)}")
+                
+                try:
+                    response_json = response.json()
+                    logger.info(f"Response Body: {json.dumps(response_json, indent=2)}")
+                    
+                    if "data" in response_json and "products" in response_json["data"]:
+                        products = response_json["data"]["products"]
+                        logger.info(f"Successfully retrieved {len(products.get('items', []))} products")
+                    else:
+                        logger.error("Products request failed or response format unexpected")
+                        if "errors" in response_json:
+                            logger.error(f"Error details: {response_json['errors']}")
+                            
+                except json.JSONDecodeError:
+                    logger.error(f"Failed to parse JSON response. Raw response: {response.text}")
+                
+            except httpx.RequestError as e:
+                logger.error(f"Request failed: {str(e)}")
+            except Exception as e:
+                logger.error(f"Error during request: {type(e).__name__} - {str(e)}")
+        
+    except Exception as e:
+        logger.error(f"Test failed: {type(e).__name__} - {str(e)}")
+    finally:
+        logger.info("=== Test Completed ===")
+
+def main():
+    logger.info(f"Starting test at {datetime.now()}")
+    try:
+        asyncio.run(test_ownerclan_api())
+    except KeyboardInterrupt:
+        logger.info("Test interrupted by user")
+    except Exception as e:
+        logger.error(f"Main error: {type(e).__name__} - {str(e)}")
+    logger.info(f"Test finished at {datetime.now()}")
+
+if __name__ == "__main__":
+    main()
+2024-11-05 21:54:40,842 - INFO - Starting test at 2024-11-05 21:54:40.842072
+2024-11-05 21:54:40,842 - INFO - === Starting Ownerclan API Test ===
+2024-11-05 21:54:41,094 - INFO - Requesting auth token via GraphQL...
+2024-11-05 21:54:41,094 - INFO - API URL: https://api-sandbox.ownerclan.com/v1/graphql
+2024-11-05 21:54:41,095 - INFO - Request Data: {
+  "query": "\n    mutation Login($username: String!, $password: String!) {\n        login(username: $username, password: $password) {\n            accessToken\n        }\n    }\n    ",
+  "variables": {
+    "username": "b00679540",
+    "password": "ehdgod1101*"
+  }
+}
+2024-11-05 21:54:41,269 - INFO - HTTP Request: POST https://api-sandbox.ownerclan.com/v1/graphql "HTTP/1.1 500 Internal Server Error"
+2024-11-05 21:54:41,270 - INFO - Auth Response Status: 500
+2024-11-05 21:54:41,270 - INFO - Auth Response: {
+  "errors": [
+    {
+      "message": "Context creation failed: No authorization header."
+    }
+  ]
+}
+2024-11-05 21:54:41,271 - ERROR - Auth failed. Status: 500
+2024-11-05 21:54:41,271 - ERROR - GraphQL Errors: [{'message': 'Context creation failed: No authorization header.'}]
+2024-11-05 21:54:41,271 - ERROR - Failed to get auth token
+2024-11-05 21:54:41,271 - INFO - === Test Completed ===
+2024-11-05 21:54:41,272 - INFO - Test finished at 2024-11-05 21:54:41.272075
+2024-11-05 21:55:45,046 - INFO - Starting test at 2024-11-05 21:55:45.046381
+2024-11-05 21:55:45,047 - INFO - === Starting Ownerclan API Test ===
+2024-11-05 21:55:45,299 - INFO - Requesting auth token...
+2024-11-05 21:55:45,299 - INFO - Auth URL: https://auth-sandbox.ownerclan.com/auth
+2024-11-05 21:55:45,299 - INFO - Auth Headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-API-KEY': 'sandbox'}
+2024-11-05 21:55:45,299 - INFO - Auth Data: {
+  "service": "ownerclan",
+  "userType": "seller",
+  "username": "b00679540",
+  "password": "ehdgod1101*",
+  "grant_type": "password",
+  "client_id": "sandbox"
+}
+2024-11-05 21:55:45,507 - INFO - HTTP Request: POST https://auth-sandbox.ownerclan.com/auth "HTTP/1.1 401 Unauthorized"
+2024-11-05 21:55:45,508 - INFO - Auth Response Status: 401
+2024-11-05 21:55:45,508 - INFO - Auth Response: {
+  "name": "IDNotFound",
+  "message": "¡∏¿Á«œ¡ˆ æ ¥¬ æ∆¿Ãµ¿‘¥œ¥Ÿ."
+}
+2024-11-05 21:55:45,508 - ERROR - Auth failed. Status: 401
+2024-11-05 21:55:45,509 - ERROR - Auth Response: {
+  "name": "IDNotFound",
+  "message": "¡∏¿Á«œ¡ˆ æ ¥¬ æ∆¿Ãµ¿‘¥œ¥Ÿ."
+}
+2024-11-05 21:55:45,509 - ERROR - Failed to get auth token
+2024-11-05 21:55:45,509 - INFO - === Test Completed ===
+2024-11-05 21:55:45,510 - INFO - Test finished at 2024-11-05 21:55:45.510912
+2024-11-05 21:59:49,113 - INFO - Starting test at 2024-11-05 21:59:49.113383
+2024-11-05 21:59:49,113 - INFO - === Starting Ownerclan API Test ===
+2024-11-05 21:59:49,374 - INFO - Requesting auth token...
+2024-11-05 21:59:49,374 - INFO - Auth URL: https://auth-sandbox.ownerclan.com/auth
+2024-11-05 21:59:49,374 - INFO - Auth Data: {
+  "service": "ownerclan",
+  "userType": "seller",
+  "username": "b00679540",
+  "password": "ehdgod1101*"
+}
+2024-11-05 21:59:49,717 - INFO - HTTP Request: POST https://auth-sandbox.ownerclan.com/auth "HTTP/1.1 401 Unauthorized"
+2024-11-05 21:59:49,718 - INFO - Auth Response Status: 401
+2024-11-05 21:59:49,718 - INFO - Auth Response: {
+  "name": "IDNotFound",
+  "message": "¡∏¿Á«œ¡ˆ æ ¥¬ æ∆¿Ãµ¿‘¥œ¥Ÿ."
+}
+2024-11-05 21:59:49,718 - ERROR - Auth failed. Status: 401
+2024-11-05 21:59:49,719 - ERROR - Error message: ¡∏¿Á«œ¡ˆ æ ¥¬ æ∆¿Ãµ¿‘¥œ¥Ÿ.
+2024-11-05 21:59:49,719 - ERROR - Failed to get auth token
+2024-11-05 21:59:49,719 - INFO - === Test Completed ===
+2024-11-05 21:59:49,720 - INFO - Test finished at 2024-11-05 21:59:49.720972
+2024-11-05 22:01:05,582 - INFO - Starting test at 2024-11-05 22:01:05.581558
+2024-11-05 22:01:05,582 - INFO - === Starting Ownerclan API Test ===
+2024-11-05 22:01:05,844 - INFO - Requesting auth token...
+2024-11-05 22:01:05,844 - INFO - Auth URL: https://auth-sandbox.ownerclan.com/auth
+2024-11-05 22:01:05,845 - INFO - Auth Data: {
+  "username": "b00679540",
+  "password": "ehdgod1101*"
+}
+2024-11-05 22:01:06,018 - INFO - HTTP Request: POST https://auth-sandbox.ownerclan.com/auth "HTTP/1.1 400 Bad Request"
+2024-11-05 22:01:06,019 - INFO - Auth Response Status: 400
+2024-11-05 22:01:06,019 - ERROR - Failed to parse auth response: 
+2024-11-05 22:01:06,019 - ERROR - Failed to get auth token
+2024-11-05 22:01:06,019 - INFO - === Test Completed ===
+2024-11-05 22:01:06,020 - INFO - Test finished at 2024-11-05 22:01:06.020254
+2024-11-05 22:01:59,168 - INFO - Starting test at 2024-11-05 22:01:59.168787
+2024-11-05 22:01:59,169 - INFO - === Starting Ownerclan API Test ===
+2024-11-05 22:01:59,432 - INFO - Requesting auth token...
+2024-11-05 22:01:59,432 - INFO - Auth URL: https://auth-sandbox.ownerclan.com/auth
+2024-11-05 22:01:59,433 - INFO - Auth Data: {
+  "service": "ownerclan",
+  "userType": "seller",
+  "username": "b00679540@naver.com",
+  "password": "ehdgod1101*"
+}
+2024-11-05 22:01:59,882 - INFO - HTTP Request: POST https://auth-sandbox.ownerclan.com/auth "HTTP/1.1 401 Unauthorized"
+2024-11-05 22:01:59,882 - INFO - Auth Response Status: 401
+2024-11-05 22:01:59,882 - INFO - Auth Response: {
+  "name": "IDNotFound",
+  "message": "¡∏¿Á«œ¡ˆ æ ¥¬ æ∆¿Ãµ¿‘¥œ¥Ÿ."
+}
+2024-11-05 22:01:59,883 - ERROR - Auth failed. Status: 401
+2024-11-05 22:01:59,883 - ERROR - Error message: ¡∏¿Á«œ¡ˆ æ ¥¬ æ∆¿Ãµ¿‘¥œ¥Ÿ.
+2024-11-05 22:01:59,883 - ERROR - Failed to get auth token
+2024-11-05 22:01:59,883 - INFO - === Test Completed ===
+2024-11-05 22:01:59,884 - INFO - Test finished at 2024-11-05 22:01:59.884463
+2024-11-05 22:07:47,331 - INFO - Starting test at 2024-11-05 22:07:47.331668
+2024-11-05 22:07:47,332 - INFO - === Starting Ownerclan API Test ===
+2024-11-05 22:07:47,600 - INFO - Requesting auth token...
+2024-11-05 22:07:47,601 - INFO - Auth URL: https://auth-sandbox.ownerclan.com/auth
+2024-11-05 22:07:47,601 - INFO - Auth Data: {
+  "service": "ownerclan",
+  "userType": "seller",
+  "username": "b00679540",
+  "password": "ehdgod1101*",
+  "grant_type": "password",
+  "client_id": "seller_api"
+}
+2024-11-05 22:07:48,772 - INFO - HTTP Request: POST https://auth-sandbox.ownerclan.com/auth "HTTP/1.1 401 Unauthorized"
+2024-11-05 22:07:48,772 - INFO - Auth Response Status: 401
+2024-11-05 22:07:48,772 - INFO - Auth Response: {
+  "name": "IDNotFound",
+  "message": "¡∏¿Á«œ¡ˆ æ ¥¬ æ∆¿Ãµ¿‘¥œ¥Ÿ."
+}
+2024-11-05 22:07:48,773 - ERROR - Auth failed. Status: 401
+2024-11-05 22:07:48,773 - ERROR - Error message: ¡∏¿Á«œ¡ˆ æ ¥¬ æ∆¿Ãµ¿‘¥œ¥Ÿ.
+2024-11-05 22:07:48,773 - ERROR - Failed to get auth token
+2024-11-05 22:07:48,773 - INFO - === Test Completed ===
+2024-11-05 22:07:48,774 - INFO - Test finished at 2024-11-05 22:07:48.774692
+2024-11-05 22:09:58,637 - INFO - Starting test at 2024-11-05 22:09:58.637828
+2024-11-05 22:09:58,638 - INFO - === Starting Ownerclan API Test ===
+2024-11-05 22:09:58,910 - INFO - Requesting auth token...
+2024-11-05 22:09:58,910 - INFO - Auth URL: https://auth-sandbox.ownerclan.com/auth
+2024-11-05 22:09:58,910 - INFO - Auth Data: {
+  "service": "ownerclan",
+  "userType": "seller",
+  "username": "b00679540",
+  "password": "ehdgod1101*"
+}
+2024-11-05 22:09:59,102 - INFO - HTTP Request: POST https://auth-sandbox.ownerclan.com/auth "HTTP/1.1 401 Unauthorized"
+2024-11-05 22:09:59,103 - INFO - Auth Response Status: 401
+2024-11-05 22:09:59,103 - INFO - Auth Response: {
+  "name": "IDNotFound",
+  "message": "¡∏¿Á«œ¡ˆ æ ¥¬ æ∆¿Ãµ¿‘¥œ¥Ÿ."
+}
+2024-11-05 22:09:59,103 - ERROR - Auth failed. Status: 401
+2024-11-05 22:09:59,104 - ERROR - Error message: ¡∏¿Á«œ¡ˆ æ ¥¬ æ∆¿Ãµ¿‘¥œ¥Ÿ.
+2024-11-05 22:09:59,104 - ERROR - Failed to get auth token
+2024-11-05 22:09:59,104 - INFO - === Test Completed ===
+2024-11-05 22:09:59,105 - INFO - Test finished at 2024-11-05 22:09:59.105781
+2024-11-05 22:27:30,088 - INFO - Starting test at 2024-11-05 22:27:30.088014
+2024-11-05 22:27:30,089 - INFO - === Starting Ownerclan API Test ===
+2024-11-05 22:27:30,358 - INFO - Requesting auth token...
+2024-11-05 22:27:30,358 - INFO - Auth URL: https://auth-sandbox.ownerclan.com/auth
+2024-11-05 22:27:30,358 - INFO - Auth Headers: {'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36', 'Accept': '*/*', 'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7', 'Origin': 'http://127.0.0.1:5500', 'Referer': 'http://127.0.0.1:5500/', 'Sec-Ch-Ua': '"Not A(Brand";v="99", "Google Chrome";v="130", "Chromium";v="130"', 'Sec-Ch-Ua-Mobile': '?0', 'Sec-Ch-Ua-Platform': '"Windows"', 'Sec-Fetch-Dest': 'empty', 'Sec-Fetch-Mode': 'cors', 'Sec-Fetch-Site': 'cross-site'}
+2024-11-05 22:27:30,358 - INFO - Auth Data: {
+  "service": "ownerclan",
+  "userType": "seller",
+  "username": "b00679540",
+  "password": "ehdgod1101*"
+}
+2024-11-05 22:27:31,045 - INFO - HTTP Request: POST https://auth-sandbox.ownerclan.com/auth "HTTP/1.1 401 Unauthorized"
+2024-11-05 22:27:31,045 - INFO - Auth Response Status: 401
+2024-11-05 22:27:31,045 - INFO - Response Headers: {'date': 'Tue, 05 Nov 2024 13:27:32 GMT', 'content-type': 'application/json; charset=utf-8', 'content-length': '73', 'connection': 'keep-alive', 'access-control-allow-origin': '*', 'etag': 'W/"49-VbEtn9WV605gjlvZDX71XNq3naU"', 'cf-cache-status': 'DYNAMIC', 'set-cookie': '__cf_bm=QIiyIumgfAW6g1HolP7x53APs1NgmFsVtEkDnx6TtUQ-1730813252-1.0.1.1-sUZXcuMAI5bdxcODCStS0H6wQJnGxawD62VqrSTTLE2aEuWQL5n6EyUO1Le_qzQMVknWNkcrsqx.53DyYKCPXQ; path=/; expires=Tue, 05-Nov-24 13:57:32 GMT; domain=.ownerclan.com; HttpOnly; Secure; SameSite=None', 'server': 'cloudflare', 'cf-ray': '8ddd2e865ecfaa5b-ICN', 'alt-svc': 'h3=":443"; ma=86400'}
+2024-11-05 22:27:31,046 - INFO - Auth Response: {
+  "name": "IDNotFound",
+  "message": "¡∏¿Á«œ¡ˆ æ ¥¬ æ∆¿Ãµ¿‘¥œ¥Ÿ."
+}
+2024-11-05 22:27:31,046 - ERROR - Auth failed. Status: 401
+2024-11-05 22:27:31,047 - ERROR - Error message: ¡∏¿Á«œ¡ˆ æ ¥¬ æ∆¿Ãµ¿‘¥œ¥Ÿ.
+2024-11-05 22:27:31,047 - ERROR - Failed to get auth token
+2024-11-05 22:27:31,047 - INFO - === Test Completed ===
+2024-11-05 22:27:31,048 - INFO - Test finished at 2024-11-05 22:27:31.048054
+2024-11-05 22:29:10,403 - INFO - Starting test at 2024-11-05 22:29:10.403532
+2024-11-05 22:29:10,404 - INFO - === Starting Ownerclan API Test ===
+2024-11-05 22:29:10,863 - INFO - HTTP Request: OPTIONS https://auth-sandbox.ownerclan.com/auth "HTTP/1.1 204 No Content"
+2024-11-05 22:29:10,864 - INFO - OPTIONS Response Status: 204
+2024-11-05 22:29:10,864 - INFO - Requesting auth token...
+2024-11-05 22:29:10,864 - INFO - Auth URL: https://auth-sandbox.ownerclan.com/auth
+2024-11-05 22:29:10,864 - INFO - Auth Data: {
+  "service": "ownerclan",
+  "userType": "seller",
+  "username": "b00679540",
+  "password": "ehdgod1101*"
+}
+2024-11-05 22:29:11,065 - INFO - HTTP Request: POST https://auth-sandbox.ownerclan.com/auth "HTTP/1.1 401 Unauthorized"
+2024-11-05 22:29:11,065 - INFO - Cookies: {'__cf_bm': 'DTPO.ihdDcKpnacXbFGYVnXlO_3Sf417oUkE1tS1sek-1730813352-1.0.1.1-JIVw339.KGlycRsHqWnlsODAH28Zxkxpman_eGkJkkjucvtaP7PjxSy437Ux2tS2RKCU8kRvLiItki69iw52mQ'}
+2024-11-05 22:29:11,065 - INFO - Auth Response Status: 401
+2024-11-05 22:29:11,066 - INFO - Response Headers: {'date': 'Tue, 05 Nov 2024 13:29:12 GMT', 'content-type': 'application/json; charset=utf-8', 'content-length': '73', 'connection': 'keep-alive', 'access-control-allow-origin': '*', 'etag': 'W/"49-VbEtn9WV605gjlvZDX71XNq3naU"', 'cf-cache-status': 'DYNAMIC', 'server': 'cloudflare', 'cf-ray': '8ddd30fa4e2c305f-ICN', 'alt-svc': 'h3=":443"; ma=86400'}
+2024-11-05 22:29:11,066 - INFO - Auth Response: {
+  "name": "IDNotFound",
+  "message": "¡∏¿Á«œ¡ˆ æ ¥¬ æ∆¿Ãµ¿‘¥œ¥Ÿ."
+}
+2024-11-05 22:29:11,066 - ERROR - Auth failed. Status: 401
+2024-11-05 22:29:11,066 - ERROR - Error message: ¡∏¿Á«œ¡ˆ æ ¥¬ æ∆¿Ãµ¿‘¥œ¥Ÿ.
+2024-11-05 22:29:11,067 - ERROR - Failed to get auth token
+2024-11-05 22:29:11,067 - INFO - === Test Completed ===
+2024-11-05 22:29:11,068 - INFO - Test finished at 2024-11-05 22:29:11.068691
+2024-11-05 22:30:05,126 - INFO - Starting test at 2024-11-05 22:30:05.126834
+2024-11-05 22:30:05,127 - INFO - === Starting Ownerclan API Test ===
+2024-11-05 22:30:05,530 - INFO - HTTP Request: OPTIONS https://auth-sandbox.ownerclan.com/auth "HTTP/1.1 204 No Content"
+2024-11-05 22:30:05,531 - INFO - OPTIONS Response Status: 204
+2024-11-05 22:30:05,531 - INFO - Requesting auth token...
+2024-11-05 22:30:05,531 - INFO - Auth URL: https://auth-sandbox.ownerclan.com/auth
+2024-11-05 22:30:05,531 - INFO - Auth Data: {
+  "service": "ownerclan",
+  "userType": "seller",
+  "username": "b00679540",
+  "password": "ehdgod1101*"
+}
+2024-11-05 22:30:05,765 - INFO - HTTP Request: POST https://auth-sandbox.ownerclan.com/auth "HTTP/1.1 401 Unauthorized"
+2024-11-05 22:30:05,765 - INFO - Cookies: {'__cf_bm': 'aDBottduvhkSChYg0tQyhP1w96cBISpk_0nfRD3xxoM-1730813406-1.0.1.1-2IRj5xE2H1SDc6YIcJeZFJOy9Ld8oous1QwqcBqnruBcP7iVQwFkI2uyGm_vmMlcjnkuxw8XiVnnqz3ApVvLMA'}
+2024-11-05 22:30:05,766 - INFO - Auth Response Status: 401
+2024-11-05 22:30:05,766 - INFO - Response Headers: {'date': 'Tue, 05 Nov 2024 13:30:06 GMT', 'content-type': 'application/json; charset=utf-8', 'content-length': '73', 'connection': 'keep-alive', 'access-control-allow-origin': '*', 'etag': 'W/"49-VbEtn9WV605gjlvZDX71XNq3naU"', 'cf-cache-status': 'DYNAMIC', 'server': 'cloudflare', 'cf-ray': '8ddd324fee1b3279-ICN', 'alt-svc': 'h3=":443"; ma=86400'}
+2024-11-05 22:30:05,766 - INFO - Auth Response: {
+  "name": "IDNotFound",
+  "message": "¡∏¿Á«œ¡ˆ æ ¥¬ æ∆¿Ãµ¿‘¥œ¥Ÿ."
+}
+2024-11-05 22:30:05,766 - ERROR - Auth failed. Status: 401
+2024-11-05 22:30:05,766 - ERROR - Error message: ¡∏¿Á«œ¡ˆ æ ¥¬ æ∆¿Ãµ¿‘¥œ¥Ÿ.
+2024-11-05 22:30:05,767 - ERROR - Failed to get auth token
+2024-11-05 22:30:05,767 - INFO - === Test Completed ===
+2024-11-05 22:30:05,768 - INFO - Test finished at 2024-11-05 22:30:05.768285
+2024-11-05 22:30:23,119 - INFO - Starting test at 2024-11-05 22:30:23.119795
+2024-11-05 22:30:23,120 - INFO - === Starting Ownerclan API Test ===
+2024-11-05 22:30:23,493 - INFO - HTTP Request: OPTIONS https://auth-sandbox.ownerclan.com/auth "HTTP/1.1 204 No Content"
+2024-11-05 22:30:23,493 - INFO - OPTIONS Response Status: 204
+2024-11-05 22:30:23,493 - INFO - Requesting auth token...
+2024-11-05 22:30:23,493 - INFO - Auth URL: https://auth-sandbox.ownerclan.com/auth
+2024-11-05 22:30:23,494 - INFO - Auth Data: {
+  "service": "ownerclan",
+  "userType": "seller",
+  "username": "b00679540",
+  "password": "ehdgod1101*"
+}
+2024-11-05 22:30:23,677 - INFO - HTTP Request: POST https://auth-sandbox.ownerclan.com/auth "HTTP/1.1 401 Unauthorized"
+2024-11-05 22:30:23,678 - INFO - Cookies: {'__cf_bm': 'Mgu3oHBo9CHfKkjBPVOC9x7dCkkF9ZmeBQM0chCO_Qs-1730813424-1.0.1.1-R7QiOGwE6mnvUdG2.g3ke6GiW4Cq4fR56LUeT0F_cEjJ_0vbW78eJ1Mvh2KoWqAj4atyjLshmMFCyj98QViBbQ'}
+2024-11-05 22:30:23,678 - INFO - Auth Response Status: 401
+2024-11-05 22:30:23,679 - INFO - Response Headers: {'date': 'Tue, 05 Nov 2024 13:30:24 GMT', 'content-type': 'application/json; charset=utf-8', 'content-length': '73', 'connection': 'keep-alive', 'access-control-allow-origin': '*', 'etag': 'W/"49-VbEtn9WV605gjlvZDX71XNq3naU"', 'cf-cache-status': 'DYNAMIC', 'server': 'cloudflare', 'cf-ray': '8ddd32c029263519-ICN', 'alt-svc': 'h3=":443"; ma=86400'}
+2024-11-05 22:30:23,679 - INFO - Auth Response: {
+  "name": "IDNotFound",
+  "message": "¡∏¿Á«œ¡ˆ æ ¥¬ æ∆¿Ãµ¿‘¥œ¥Ÿ."
+}
+2024-11-05 22:30:23,679 - ERROR - Auth failed. Status: 401
+2024-11-05 22:30:23,679 - ERROR - Error message: ¡∏¿Á«œ¡ˆ æ ¥¬ æ∆¿Ãµ¿‘¥œ¥Ÿ.
+2024-11-05 22:30:23,680 - ERROR - Failed to get auth token
+2024-11-05 22:30:23,680 - INFO - === Test Completed ===
+2024-11-05 22:30:23,681 - INFO - Test finished at 2024-11-05 22:30:23.681511
+2024-11-05 22:32:36,453 - INFO - Starting test at 2024-11-05 22:32:36.453203
+2024-11-05 22:32:36,454 - INFO - === Starting Ownerclan API Test ===
+2024-11-05 22:32:36,828 - INFO - HTTP Request: OPTIONS https://auth-sandbox.ownerclan.com/auth "HTTP/1.1 204 No Content"
+2024-11-05 22:32:36,828 - INFO - OPTIONS Response Status: 204
+2024-11-05 22:32:36,828 - INFO - Requesting auth token...
+2024-11-05 22:32:36,828 - INFO - Auth URL: https://auth-sandbox.ownerclan.com/auth
+2024-11-05 22:32:36,829 - INFO - Auth Data: {
+  "service": "ownerclan",
+  "userType": "seller",
+  "username": "b00679540",
+  "password": "ehdgod1101*"
+}
+2024-11-05 22:32:36,946 - INFO - HTTP Request: POST https://auth-sandbox.ownerclan.com/auth "HTTP/1.1 401 Unauthorized"
+2024-11-05 22:32:36,947 - INFO - Cookies: {'__cf_bm': 'ODcmCioX1ZVuxEaap6YEPM243fo2_Jw7gmp9NtSwvw0-1730813557-1.0.1.1-eQSdRuIGP4te1cL6r0ZlYhYPzUxaqd4zmJBoxhNVdaNkKxVZJFbkf.3InTgiDik7qCNUnmST..5JgdLKQz1Rvw'}
+2024-11-05 22:32:36,947 - INFO - Auth Response Status: 401
+2024-11-05 22:32:36,947 - INFO - Response Headers: {'date': 'Tue, 05 Nov 2024 13:32:38 GMT', 'content-type': 'application/json; charset=utf-8', 'content-length': '73', 'connection': 'keep-alive', 'access-control-allow-origin': '*', 'etag': 'W/"49-VbEtn9WV605gjlvZDX71XNq3naU"', 'cf-cache-status': 'DYNAMIC', 'server': 'cloudflare', 'cf-ray': '8ddd36017b9ed1da-ICN', 'alt-svc': 'h3=":443"; ma=86400'}
+2024-11-05 22:32:36,948 - INFO - Auth Response: {
+  "name": "IDNotFound",
+  "message": "¡∏¿Á«œ¡ˆ æ ¥¬ æ∆¿Ãµ¿‘¥œ¥Ÿ."
+}
+2024-11-05 22:32:36,948 - ERROR - Auth failed. Status: 401
+2024-11-05 22:32:36,948 - ERROR - Error message: ¡∏¿Á«œ¡ˆ æ ¥¬ æ∆¿Ãµ¿‘¥œ¥Ÿ.
+2024-11-05 22:32:36,948 - ERROR - Failed to get auth token
+2024-11-05 22:32:36,948 - INFO - === Test Completed ===
+2024-11-05 22:32:36,949 - INFO - Test finished at 2024-11-05 22:32:36.949198
+2024-11-05 22:33:46,905 - INFO - Starting test at 2024-11-05 22:33:46.905481
+2024-11-05 22:33:46,905 - INFO - === Starting Ownerclan API Test ===
+2024-11-05 22:33:47,247 - INFO - HTTP Request: OPTIONS https://auth-sandbox.ownerclan.com/auth "HTTP/1.1 204 No Content"
+2024-11-05 22:33:47,365 - INFO - OPTIONS Response Status: 204
+2024-11-05 22:33:47,365 - INFO - Requesting auth token...
+2024-11-05 22:33:47,365 - INFO - Auth URL: https://auth-sandbox.ownerclan.com/auth
+2024-11-05 22:33:47,365 - INFO - Auth Data: {
+  "service": "ownerclan",
+  "userType": "seller",
+  "username": "b00679540",
+  "password": "ehdgod1101*"
+}
+2024-11-05 22:33:47,518 - INFO - HTTP Request: POST https://auth-sandbox.ownerclan.com/auth "HTTP/1.1 401 Unauthorized"
+2024-11-05 22:33:47,518 - INFO - Cookies: {'__cf_bm': 'kcS1hhYY4CZMSHiB8F_a6KnYPZoJg.PHFBLuwFQU2Xk-1730813628-1.0.1.1-PJQJVlvOPgH4NIAsSP8DmlLK_x_UKj9T4lb_0EJ71dtgYN.13vcJbIbcUDv6oEmEcSpcUZ.qzUbAmGMk.wFcqw'}
+2024-11-05 22:33:47,518 - INFO - Auth Response Status: 401
+2024-11-05 22:33:47,518 - INFO - Response Headers: {'date': 'Tue, 05 Nov 2024 13:33:48 GMT', 'content-type': 'application/json; charset=utf-8', 'content-length': '73', 'connection': 'keep-alive', 'access-control-allow-origin': '*', 'etag': 'W/"49-VbEtn9WV605gjlvZDX71XNq3naU"', 'cf-cache-status': 'DYNAMIC', 'server': 'cloudflare', 'cf-ray': '8ddd37ba5e72d1ee-ICN', 'alt-svc': 'h3=":443"; ma=86400'}
+2024-11-05 22:33:47,519 - INFO - Auth Response: {
+  "name": "IDNotFound",
+  "message": "¡∏¿Á«œ¡ˆ æ ¥¬ æ∆¿Ãµ¿‘¥œ¥Ÿ."
+}
+2024-11-05 22:33:47,519 - ERROR - Auth failed. Status: 401
+2024-11-05 22:33:47,519 - ERROR - Error message: ¡∏¿Á«œ¡ˆ æ ¥¬ æ∆¿Ãµ¿‘¥œ¥Ÿ.
+2024-11-05 22:33:47,519 - ERROR - Failed to get auth token
+2024-11-05 22:33:47,519 - INFO - === Test Completed ===
+2024-11-05 22:33:47,520 - INFO - Test finished at 2024-11-05 22:33:47.520077
+2024-11-05 22:35:56,824 - INFO - Starting test at 2024-11-05 22:35:56.824319
+2024-11-05 22:35:56,825 - INFO - === Starting Ownerclan API Test ===
+2024-11-05 22:35:57,181 - INFO - HTTP Request: OPTIONS https://auth-sandbox.ownerclan.com/auth "HTTP/1.1 204 No Content"
+2024-11-05 22:35:57,182 - INFO - OPTIONS Response Status: 204
+2024-11-05 22:35:57,182 - INFO - Requesting auth token...
+2024-11-05 22:35:57,182 - INFO - Auth URL: https://auth-sandbox.ownerclan.com/auth
+2024-11-05 22:35:57,182 - INFO - Auth Data: {
+  "service": "ownerclan",
+  "userType": "seller",
+  "username": "b00679540",
+  "password": "ehdgod1101*"
+}
+2024-11-05 22:35:57,383 - INFO - HTTP Request: POST https://auth-sandbox.ownerclan.com/auth "HTTP/1.1 401 Unauthorized"
+2024-11-05 22:35:57,384 - INFO - Cookies: {'__cf_bm': 'ooF43lfjHr6MW7jd4_IOdJWnp0aVCbaCwsCoFx9QgcM-1730813758-1.0.1.1-xEnCAmnLshwSPW1peWJEeoxa474E9OBI_EEdVLXAhXZ5g2y93A9g7_om0ZfLd0G1509p_EA.lCjZA_YpOIm.1Q'}
+2024-11-05 22:35:57,384 - INFO - Auth Response Status: 401
+2024-11-05 22:35:57,384 - INFO - Response Headers: {'date': 'Tue, 05 Nov 2024 13:35:58 GMT', 'content-type': 'application/json; charset=utf-8', 'content-length': '73', 'connection': 'keep-alive', 'access-control-allow-origin': '*', 'etag': 'W/"49-VbEtn9WV605gjlvZDX71XNq3naU"', 'cf-cache-status': 'DYNAMIC', 'server': 'cloudflare', 'cf-ray': '8ddd3ae5ce1baa4e-ICN', 'alt-svc': 'h3=":443"; ma=86400'}
+2024-11-05 22:35:57,384 - INFO - Auth Response: {
+  "name": "IDNotFound",
+  "message": "¡∏¿Á«œ¡ˆ æ ¥¬ æ∆¿Ãµ¿‘¥œ¥Ÿ."
+}
+2024-11-05 22:35:57,385 - ERROR - Auth failed. Status: 401
+2024-11-05 22:35:57,385 - ERROR - Error message: ¡∏¿Á«œ¡ˆ æ ¥¬ æ∆¿Ãµ¿‘¥œ¥Ÿ.
+2024-11-05 22:35:57,385 - ERROR - Failed to get auth token
+2024-11-05 22:35:57,385 - INFO - === Test Completed ===
+2024-11-05 22:35:57,386 - INFO - Test finished at 2024-11-05 22:35:57.386935
+2024-11-05 22:39:38,972 - INFO - Starting test at 2024-11-05 22:39:38.972699
+2024-11-05 22:39:38,973 - INFO - === Starting Ownerclan API Test ===
+2024-11-05 22:39:38,973 - ERROR - Request failed: Using http2=True, but the 'h2' package is not installed. Make sure to install httpx using `pip install httpx[http2]`.
+2024-11-05 22:39:38,974 - ERROR - Failed to get auth token
+2024-11-05 22:39:38,974 - INFO - === Test Completed ===
+2024-11-05 22:39:38,974 - INFO - Test finished at 2024-11-05 22:39:38.974701
+2024-11-05 22:41:15,108 - INFO - === Starting Test ===
+2024-11-05 22:41:15,109 - INFO - 
+Testing sandbox environment...
+2024-11-05 22:41:15,379 - INFO - Testing sandbox environment...
+2024-11-05 22:41:15,379 - INFO - URL: https://auth-sandbox.ownerclan.com/auth
+2024-11-05 22:41:15,379 - INFO - Request Data: {"service": "ownerclan", "userType": "seller", "username": "b00679540", "password": "ehdgod1101*"}
+2024-11-05 22:41:15,641 - INFO - HTTP Request: POST https://auth-sandbox.ownerclan.com/auth "HTTP/1.1 401 Unauthorized"
+2024-11-05 22:41:15,641 - INFO - Response Status: 401
+2024-11-05 22:41:15,641 - ERROR - Error occurred
+2024-11-05 22:41:15,642 - ERROR - Environment: sandbox
+2024-11-05 22:41:15,642 - ERROR - Status: 401
+2024-11-05 22:41:15,642 - ERROR - Response: {
+  "name": "IDNotFound",
+  "message": "\uc874\uc7ac\ud558\uc9c0 \uc54a\ub294 \uc544\uc774\ub514\uc785\ub2c8\ub2e4."
+}
+2024-11-05 22:41:15,642 - INFO - 
+Testing production environment...
+2024-11-05 22:41:15,914 - INFO - Testing production environment...
+2024-11-05 22:41:15,914 - INFO - URL: https://auth.ownerclan.com/auth
+2024-11-05 22:41:15,915 - INFO - Request Data: {"service": "ownerclan", "userType": "seller", "username": "b00679540", "password": "ehdgod1101*"}
+2024-11-05 22:41:16,273 - INFO - HTTP Request: POST https://auth.ownerclan.com/auth "HTTP/1.1 200 OK"
+2024-11-05 22:41:16,274 - INFO - Response Status: 200
+2024-11-05 22:41:16,274 - ERROR - Failed to parse response: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzY29wZXMiOlsiaXRlbTpyZWFkIiwicHJvZHVjdDpyZWFkIiwiY2F0ZWdvcnk6cmVhZCIsIm9yZGVyOmFsbCIsInRyYW5zYWN0aW9uOnJlYWQiLCJjdXN0b21lclNlcnZpY2U6cmVhZCJdLCJzdWIiOiJiMDA2Nzk1NDAiLCJzZXJ2aWNlIjoib3duZXJjbGFuIiwidXNlclR5cGUiOiJzZWxsZXIiLCJpYXQiOjE3MzA4MTQwNzcsImV4cCI6MTczMzQwNjA3N30.oWcyl4FEHBHjNNt98_nZx9C_tWVRj--XgRsA2HKfim8
+2024-11-05 22:41:16,275 - INFO - === Test Complete ===
+2024-11-05 22:43:09,158 - INFO - === Starting Test ===
+2024-11-05 22:43:09,159 - INFO - 
+Testing sandbox environment...
+2024-11-05 22:43:09,438 - INFO - Testing sandbox environment...
+2024-11-05 22:43:09,439 - INFO - URL: https://auth-sandbox.ownerclan.com/auth
+2024-11-05 22:43:09,439 - INFO - Request Data: {"service": "ownerclan", "userType": "seller", "username": "b00679540", "password": "ehdgod1101*"}
+2024-11-05 22:43:09,832 - INFO - HTTP Request: POST https://auth-sandbox.ownerclan.com/auth "HTTP/1.1 401 Unauthorized"
+2024-11-05 22:43:09,832 - INFO - Response Status: 401
+2024-11-05 22:43:09,832 - ERROR - Error occurred
+2024-11-05 22:43:09,833 - ERROR - Environment: sandbox
+2024-11-05 22:43:09,833 - ERROR - Status: 401
+2024-11-05 22:43:09,833 - ERROR - Response: {
+  "name": "IDNotFound",
+  "message": "\uc874\uc7ac\ud558\uc9c0 \uc54a\ub294 \uc544\uc774\ub514\uc785\ub2c8\ub2e4."
+}
+2024-11-05 22:43:09,833 - INFO - 
+Testing production environment...
+2024-11-05 22:43:10,117 - INFO - Testing production environment...
+2024-11-05 22:43:10,117 - INFO - URL: https://auth.ownerclan.com/auth
+2024-11-05 22:43:10,117 - INFO - Request Data: {"service": "ownerclan", "userType": "seller", "username": "b00679540", "password": "ehdgod1101*"}
+2024-11-05 22:43:10,335 - INFO - HTTP Request: POST https://auth.ownerclan.com/auth "HTTP/1.1 200 OK"
+2024-11-05 22:43:10,336 - INFO - Response Status: 200
+2024-11-05 22:43:10,336 - ERROR - Failed to parse response: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzY29wZXMiOlsiaXRlbTpyZWFkIiwicHJvZHVjdDpyZWFkIiwiY2F0ZWdvcnk6cmVhZCIsIm9yZGVyOmFsbCIsInRyYW5zYWN0aW9uOnJlYWQiLCJjdXN0b21lclNlcnZpY2U6cmVhZCJdLCJzdWIiOiJiMDA2Nzk1NDAiLCJzZXJ2aWNlIjoib3duZXJjbGFuIiwidXNlclR5cGUiOiJzZWxsZXIiLCJpYXQiOjE3MzA4MTQxOTEsImV4cCI6MTczMzQwNjE5MX0.x1pVE17HnCjjCB5B78hfsblpI-bckXYU5Dvi_IABoT8
+2024-11-05 22:43:10,337 - INFO - === Test Complete ===
+2024-11-05 22:44:31,764 - INFO - === Starting Test ===
+2024-11-05 22:44:31,764 - INFO - 
+Testing sandbox environment...
+2024-11-05 22:44:32,055 - INFO - Testing sandbox environment...
+2024-11-05 22:44:32,055 - INFO - URL: https://auth-sandbox.ownerclan.com/auth
+2024-11-05 22:44:32,055 - INFO - Request Data: {"service": "ownerclan", "userType": "seller", "username": "b00679540", "password": "ehdgod1101*"}
+2024-11-05 22:44:32,257 - INFO - HTTP Request: POST https://auth-sandbox.ownerclan.com/auth "HTTP/1.1 401 Unauthorized"
+2024-11-05 22:44:32,258 - INFO - Response Status: 401
+2024-11-05 22:44:32,258 - ERROR - Error occurred
+2024-11-05 22:44:32,258 - ERROR - Environment: sandbox
+2024-11-05 22:44:32,259 - ERROR - Status: 401
+2024-11-05 22:44:32,259 - ERROR - Response: {
+  "name": "IDNotFound",
+  "message": "\uc874\uc7ac\ud558\uc9c0 \uc54a\ub294 \uc544\uc774\ub514\uc785\ub2c8\ub2e4."
+}
+2024-11-05 22:44:32,259 - INFO - 
+Testing production environment...
+2024-11-05 22:44:32,541 - INFO - Testing production environment...
+2024-11-05 22:44:32,541 - INFO - URL: https://auth.ownerclan.com/auth
+2024-11-05 22:44:32,541 - INFO - Request Data: {"service": "ownerclan", "userType": "seller", "username": "b00679540", "password": "ehdgod1101*"}
+2024-11-05 22:44:32,729 - INFO - HTTP Request: POST https://auth.ownerclan.com/auth "HTTP/1.1 200 OK"
+2024-11-05 22:44:32,730 - INFO - Response Status: 200
+2024-11-05 22:44:32,730 - ERROR - Failed to parse response: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzY29wZXMiOlsiaXRlbTpyZWFkIiwicHJvZHVjdDpyZWFkIiwiY2F0ZWdvcnk6cmVhZCIsIm9yZGVyOmFsbCIsInRyYW5zYWN0aW9uOnJlYWQiLCJjdXN0b21lclNlcnZpY2U6cmVhZCJdLCJzdWIiOiJiMDA2Nzk1NDAiLCJzZXJ2aWNlIjoib3duZXJjbGFuIiwidXNlclR5cGUiOiJzZWxsZXIiLCJpYXQiOjE3MzA4MTQyNzMsImV4cCI6MTczMzQwNjI3M30.bjiL3zOzDiOpM2xLPRoxwWSqiyGWKhGnVX7FGO62uNI
+2024-11-05 22:44:32,731 - INFO - === Test Complete ===
+2024-11-05 22:46:23,618 - INFO - === ªÛ«∞ ¡∂»∏ ≈◊Ω∫∆Æ Ω√¿€ ===
+2024-11-05 22:46:24,057 - INFO - HTTP Request: POST https://auth.ownerclan.com/auth "HTTP/1.1 200 OK"
+2024-11-05 22:46:24,538 - INFO - HTTP Request: POST https://api.ownerclan.com/v1/graphql "HTTP/1.1 400 Bad Request"
+2024-11-05 22:46:24,539 - ERROR - GraphQL ø°∑Ø: [{'message': 'Cannot query field "products" on type "Query".'}]
+2024-11-05 22:46:24,539 - INFO - === ≈◊Ω∫∆Æ øœ∑· ===

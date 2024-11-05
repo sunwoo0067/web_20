@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>오너클랜 API 인증 테스트</title>
+    <!-- jQuery CDN -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <style>
+        body {
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            min-height: 100px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h2>오너클랜 API 인증 테스트</h2>
+    <button onclick="testAuth('sandbox')">샌드박스 환경 테스트</button>
+    <button onclick="testAuth('production')">프로덕션 환경 테스트</button>
+    <div id="result"></div>
+
+    <script>
+        function testAuth(env) {
+            // 인증 데이터 설정
+            const authData = {
+                service: "ownerclan",
+                userType: "seller",
+                username: "b00679540",
+                password: "ehdgod1101*"
+            };
+
+            // 환경에 따른 URL 설정
+            const baseUrl = env === 'sandbox' 
+                ? "https://auth-sandbox.ownerclan.com/auth"
+                : "https://auth.ownerclan.com/auth";
+
+            // 결과 창 초기화
+            $('#result').html('요청 중...');
+
+            // API 요청
+            $.ajax({
+                url: baseUrl,
+                type: "POST",
+                contentType: "application/json",
+                processData: false,
+                data: JSON.stringify(authData),
+                success: function(response) {
+                    $('#result').html(`
+                        <h3>성공!</h3>
+                        <p>환경: ${env}</p>
+                        <pre>${JSON.stringify(response, null, 2)}</pre>
+                    `);
+                },
+                error: function(xhr, status, error) {
+                    $('#result').html(`
+                        <h3>오류 발생</h3>
+                        <p>환경: ${env}</p>
+                        <p>상태: ${status}</p>
+                        <p>에러: ${error}</p>
+                        <p>응답:</p>
+                        <pre>${xhr.responseText}</pre>
+                    `);
+                }
+            });
+        }
+    </script>
+</body>
+</html>
